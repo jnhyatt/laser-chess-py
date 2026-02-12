@@ -1,93 +1,38 @@
 import asyncio
-import itertools
 import pygame
 from pygame.math import Vector2
 import sys
-from typing import Tuple, TypedDict
 
 from client import LocalClient
-from draw import Laser, MoveIndicatorDrawable, PieceDrawable
-from logic import Allegiance, BoardState, Move, MoveKind, opponent, update_state, winner
+from draw import LaserDrawable, MoveIndicatorDrawable, PieceDrawable
+from logic import (
+    BoardState,
+    King,
+    MoveKind,
+    OneSided,
+    Piece,
+    TwoSided,
+    Wall,
+)
 from protocol import ClientInterface, ServerInterface
 from server import LocalServer
 
 
 def tmp_board_state() -> BoardState:
     return [
-        {"kind": "king", "position": Vector2(5, 0), "allegiance": "red"},
-        {
-            "kind": "wall",
-            "position": Vector2(6, 0),
-            "allegiance": "red",
-            "stacked": True,
-        },
-        {
-            "kind": "wall",
-            "position": Vector2(4, 0),
-            "allegiance": "red",
-            "stacked": True,
-        },
-        {
-            "kind": "two-sided",
-            "position": Vector2(7, 0),
-            "allegiance": "red",
-            "dir": "se",
-        },
-        {"kind": "king", "position": Vector2(4, 7), "allegiance": "blue"},
-        {
-            "kind": "wall",
-            "position": Vector2(3, 7),
-            "allegiance": "blue",
-            "stacked": True,
-        },
-        {
-            "kind": "wall",
-            "position": Vector2(5, 7),
-            "allegiance": "blue",
-            "stacked": True,
-        },
-        {
-            "kind": "two-sided",
-            "position": Vector2(2, 7),
-            "allegiance": "blue",
-            "dir": "se",
-        },
-        {
-            "kind": "one-sided",
-            "position": Vector2(9, 5),
-            "allegiance": "red",
-            "dir": "sw",
-        },
-        {
-            "kind": "one-sided",
-            "position": Vector2(4, 5),
-            "allegiance": "blue",
-            "dir": "se",
-        },
-        {
-            "kind": "one-sided",
-            "position": Vector2(4, 6),
-            "allegiance": "red",
-            "dir": "ne",
-        },
-        {
-            "kind": "one-sided",
-            "position": Vector2(6, 6),
-            "allegiance": "blue",
-            "dir": "nw",
-        },
-        {
-            "kind": "one-sided",
-            "position": Vector2(6, 2),
-            "allegiance": "red",
-            "dir": "sw",
-        },
-        {
-            "kind": "one-sided",
-            "position": Vector2(5, 2),
-            "allegiance": "blue",
-            "dir": "ne",
-        },
+        Piece(Vector2(5, 0), "red", King()),
+        Piece(Vector2(6, 0), "red", Wall()),
+        Piece(Vector2(4, 0), "red", Wall()),
+        Piece(Vector2(7, 0), "red", TwoSided("se")),
+        Piece(Vector2(3, 7), "blue", King()),
+        Piece(Vector2(5, 7), "blue", Wall()),
+        Piece(Vector2(2, 7), "blue", TwoSided("se")),
+        Piece(Vector2(9, 5), "red", OneSided("sw")),
+        Piece(Vector2(4, 5), "blue", OneSided("se")),
+        Piece(Vector2(4, 6), "red", OneSided("ne")),
+        Piece(Vector2(6, 6), "blue", OneSided("nw")),
+        Piece(Vector2(6, 2), "red", OneSided("sw")),
+        Piece(Vector2(5, 2), "blue", OneSided("ne")),
     ]
 
 
@@ -110,7 +55,7 @@ async def main() -> None:
                 color = (180, 180, 128) if (x + y) % 2 == 0 else (24, 24, 24)
                 pygame.draw.rect(surface, color, (x * 90 + 190, y * 90, 90, 90))
 
-        laser = Laser(
+        laser = LaserDrawable(
             [
                 Vector2(9, 8),
                 Vector2(9, 5),
@@ -123,7 +68,11 @@ async def main() -> None:
             ],
             progress[0],
         )
-        pieces = [PieceDrawable(x) for x in tmp_board_state()]
+        pieces = tmp_board_state()
+        piece_drawables = [
+            PieceDrawable(x.kind, x.position * 90 + Vector2(235, 45), 0, x.allegiance)
+            for x in pieces
+        ]
         move_options: list[MoveKind] = [
             "e",
             "ne",
@@ -137,13 +86,13 @@ async def main() -> None:
         ]
         move_indicators = [
             MoveIndicatorDrawable(
-                pieces[9].piece,
+                pieces[8],
                 dir,
             )
             for dir in move_options
         ]
         laser.draw(surface)
-        for piece in pieces:
+        for piece in piece_drawables:
             piece.draw(surface)
         for indicator in move_indicators:
             indicator.draw(surface)

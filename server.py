@@ -1,5 +1,5 @@
 import asyncio
-from logic import Allegiance, BoardState, Move, opponent, update_state, winner
+from logic import Allegiance, BoardState, Laser, Move, opponent, update_state, winner
 from protocol import ClientInterface, ClientMessage, ServerInterface
 from typing import Literal, TypedDict
 
@@ -55,6 +55,7 @@ class LocalServer(ServerInterface):
         )
         while True:
             move = await self.client_moves.get()
+            laser = Laser.start(self.game.player_turn)
             await clients[opponent(self.game.player_turn)].send(
                 {
                     "kind": "opponent_move",

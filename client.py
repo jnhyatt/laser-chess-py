@@ -46,10 +46,10 @@ class Selected(TypedDict):
     piece_index: int
 
 
-type Clickable = Piece | MoveIndicator
+type Clickable = PieceClickable | MoveIndicator
 
 
-class Piece(TypedDict):
+class PieceClickable(TypedDict):
     kind: Literal["piece"]
     hitbox: Rect
     draggable: Literal[True]

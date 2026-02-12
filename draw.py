@@ -2,7 +2,17 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import itertools
 import math
-from logic import King, MoveDir, MoveKind, OneSided, Piece, RotateDir, TwoSided, Wall
+from logic import (
+    King,
+    MoveDir,
+    MoveKind,
+    OneSided,
+    Piece,
+    PieceKind,
+    RotateDir,
+    TwoSided,
+    Wall,
+)
 import pygame
 from pygame.math import Vector2
 
@@ -17,7 +27,7 @@ class Drawable(ABC):
 
 
 @dataclass
-class Laser(Drawable):
+class LaserDrawable(Drawable):
     path: list[Vector2]
     progress: float
 
@@ -55,18 +65,25 @@ class Laser(Drawable):
 # represent these intermediate states.
 @dataclass
 class PieceDrawable(Drawable):
-    piece: Piece
+    piece: PieceKind
+    position: Vector2
+    rotation: float
+    allegiance: str
 
     def draw(self, surface: pygame.Surface) -> None:
-        match self.piece["kind"]:
+        match self.piece.kind:
             case "one-sided":
-                draw_one_sided(surface, self.piece)
+                draw_one_sided(
+                    surface, self.piece, self.position, self.rotation, self.allegiance
+                )
             case "two-sided":
-                draw_two_sided(surface, self.piece)
+                draw_two_sided(
+                    surface, self.piece, self.position, self.rotation, self.allegiance
+                )
             case "king":
-                draw_king(surface, self.piece)
+                draw_king(surface, self.piece, self.position, self.allegiance)
             case "wall":
-                draw_wall(surface, self.piece)
+                draw_wall(surface, self.piece, self.position, self.allegiance)
 
 
 @dataclass
@@ -76,7 +93,7 @@ class MoveIndicatorDrawable(Drawable):
 
     def draw(self, surface: pygame.Surface) -> None:
         color = (255, 255, 0)
-        offset = self.piece["position"] * 90 + Vector2(235, 45)
+        offset = self.piece.position * 90 + Vector2(235, 45)
         match self.move:
             case "cw" | "ccw":
                 points = [x + offset for x in turn_arrow(self.move)]
@@ -89,11 +106,16 @@ class MoveIndicatorDrawable(Drawable):
                 pygame.draw.polygon(surface, color, points)
 
 
-def draw_one_sided(surface: pygame.Surface, piece: OneSided) -> None:
-    x, y = piece["position"]
-    color = (200, 0, 0) if piece["allegiance"] == "red" else (0, 0, 200)
-    points = [(10, 10), (10, 80), (80, 80), (80, 10)]
-    match piece["dir"]:
+def draw_one_sided(
+    surface: pygame.Surface,
+    piece: OneSided,
+    position: Vector2,
+    rotation: float,
+    allegiance: str,
+) -> None:
+    color = (200, 0, 0) if allegiance == "red" else (0, 0, 200)
+    points = [Vector2(-35, -35), Vector2(-35, 35), Vector2(35, 35), Vector2(35, -35)]
+    match piece.dir:
         case "ne":
             indices = [0, 1, 2]
         case "se":
@@ -105,37 +127,60 @@ def draw_one_sided(surface: pygame.Surface, piece: OneSided) -> None:
     pygame.draw.polygon(
         surface,
         color,
-        [(x * 90 + 190 + points[i][0], y * 90 + points[i][1]) for i in indices],
+        [position + rotated(points[i], rotation) for i in indices],
     )
 
 
-def draw_two_sided(surface: pygame.Surface, piece: TwoSided) -> None:
-    x, y = piece["position"]
-    color = (200, 0, 0) if piece["allegiance"] == "red" else (0, 0, 200)
-    match piece["dir"]:
+def draw_two_sided(
+    surface: pygame.Surface,
+    piece: TwoSided,
+    position: Vector2,
+    rotation: float,
+    allegiance: str,
+) -> None:
+    color = (200, 0, 0) if allegiance == "red" else (0, 0, 200)
+    match piece.dir:
         case "ne":
-            points = [(10, 10), (20, 10), (80, 70), (80, 80), (70, 80), (10, 20)]
+            points = [
+                Vector2(-35, -35),
+                Vector2(-25, -35),
+                Vector2(35, 25),
+                Vector2(35, 35),
+                Vector2(25, 35),
+                Vector2(-35, -25),
+            ]
         case "se":
-            points = [(10, 80), (20, 80), (80, 20), (80, 10), (70, 10), (10, 70)]
+            points = [
+                Vector2(-35, 35),
+                Vector2(-25, 35),
+                Vector2(35, -25),
+                Vector2(35, -35),
+                Vector2(25, -35),
+                Vector2(-35, 25),
+            ]
     pygame.draw.polygon(
         surface,
         color,
-        [(x * 90 + 190 + points[i][0], y * 90 + points[i][1]) for i in range(6)],
+        [position + rotated(points[i], rotation) for i in range(6)],
     )
 
 
-def draw_king(surface: pygame.Surface, piece: King) -> None:
-    x, y = piece["position"]
-    color = (200, 0, 0) if piece["allegiance"] == "red" else (0, 0, 200)
-    pygame.draw.circle(surface, color, (x * 90 + 235, y * 90 + 45), 30)
+def draw_king(
+    surface: pygame.Surface, piece: King, position: Vector2, allegiance: str
+) -> None:
+    color = (200, 0, 0) if allegiance == "red" else (0, 0, 200)
+    pygame.draw.circle(surface, color, position, 30)
 
 
-def draw_wall(surface: pygame.Surface, piece: Wall) -> None:
-    x, y = piece["position"]
-    color = (200, 0, 0) if piece["allegiance"] == "red" else (0, 0, 200)
-    pygame.draw.rect(surface, color, (x * 90 + 205, y * 90 + 15, 60, 60))
-    if piece["stacked"]:
-        pygame.draw.rect(surface, (200, 200, 0), (x * 90 + 215, y * 90 + 25, 40, 40))
+def draw_wall(
+    surface: pygame.Surface, piece: Wall, position: Vector2, allegiance: str
+) -> None:
+    color = (200, 0, 0) if allegiance == "red" else (0, 0, 200)
+    pygame.draw.rect(surface, color, (position.x - 30, position.y - 30, 60, 60))
+    if piece.stacked:
+        pygame.draw.rect(
+            surface, (200, 200, 0), (position.x - 15, position.y - 15, 30, 30)
+        )
 
 
 def move_arrow() -> list[Vector2]:
