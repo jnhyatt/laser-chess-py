@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from logic import Allegiance, BoardState, Move
 from typing import Literal, TypedDict
 
@@ -20,21 +21,21 @@ class ClientInterface(ABC):
 type ServerMessage = InitMessage | OpponentMove
 
 
-class InitMessage(TypedDict):
-    kind: Literal["init"]
+@dataclass
+class InitMessage:
     state: BoardState
     player_allegiance: Allegiance
     opponent_name: str
 
 
-class OpponentMove(TypedDict):
-    kind: Literal["opponent_move"]
+@dataclass
+class OpponentMove:
     move: Move
 
 
 type ClientMessage = MoveMessage
 
 
-class MoveMessage(TypedDict):
-    kind: Literal["move"]
+@dataclass
+class MoveMessage:
     move: Move

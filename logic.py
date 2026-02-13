@@ -195,7 +195,7 @@ def update_state(
         return None  # Can't move other player's pieces
     match move.kind:
         case "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw":
-            target = move_target(piece, move.kind)
+            target = add_dir(piece.position, move.kind)
             if not (0 <= target.x < 10 and 0 <= target.y < 8):
                 return None  # Target position is out of bounds
             if any(piece.position == target for piece in state):
@@ -212,26 +212,24 @@ def update_state(
     return state
 
 
-# Returns the position a piece would move to if it moved in the specified direction. Does no bounds
-# checking or collision checking.
-def move_target(piece: Piece, dir: MoveDir) -> Vector2:
+def add_dir(position: Vector2, dir: MoveDir) -> Vector2:
     match dir:
         case "n":
-            return piece.position + Vector2(0, -1)
+            return position + Vector2(0, -1)
         case "ne":
-            return piece.position + Vector2(1, -1)
+            return position + Vector2(1, -1)
         case "e":
-            return piece.position + Vector2(1, 0)
+            return position + Vector2(1, 0)
         case "se":
-            return piece.position + Vector2(1, 1)
+            return position + Vector2(1, 1)
         case "s":
-            return piece.position + Vector2(0, 1)
+            return position + Vector2(0, 1)
         case "sw":
-            return piece.position + Vector2(-1, 1)
+            return position + Vector2(-1, 1)
         case "w":
-            return piece.position + Vector2(-1, 0)
+            return position + Vector2(-1, 0)
         case "nw":
-            return piece.position + Vector2(-1, -1)
+            return position + Vector2(-1, -1)
 
 
 def rotate_one_sided(piece: OneSided, dir: RotateDir) -> None:

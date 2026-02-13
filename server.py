@@ -1,6 +1,13 @@
 import asyncio
 from logic import Allegiance, BoardState, Laser, Move, opponent, update_state, winner
-from protocol import ClientInterface, ClientMessage, ServerInterface
+from protocol import (
+    ClientInterface,
+    ClientMessage,
+    InitMessage,
+    MoveMessage,
+    OpponentMove,
+    ServerInterface,
+)
 from typing import Literal, TypedDict
 
 
@@ -38,38 +45,34 @@ class LocalServer(ServerInterface):
     async def start(self, red: ClientInterface, blue: ClientInterface) -> None:
         clients: Clients = {"red": red, "blue": blue}
         await red.send(
-            {
-                "kind": "init",
-                "state": self.game.state,
-                "player_allegiance": "red",
-                "opponent_name": "TODO",
-            }
+            InitMessage(
+                state=self.game.state,
+                player_allegiance="red",
+                opponent_name="TODO",
+            )
         )
         await blue.send(
-            {
-                "kind": "init",
-                "state": self.game.state,
-                "player_allegiance": "blue",
-                "opponent_name": "TODO",
-            }
+            InitMessage(
+                state=self.game.state,
+                player_allegiance="blue",
+                opponent_name="TODO",
+            )
         )
         while True:
             move = await self.client_moves.get()
             laser = Laser.start(self.game.player_turn)
             await clients[opponent(self.game.player_turn)].send(
-                {
-                    "kind": "opponent_move",
-                    "move": move,
-                }
+                OpponentMove(
+                    move=move,
+                )
             )
             if winner(self.game.state) is not None:
                 break
 
     # TODO maybe doesn't have to be async
     async def send(self, message: ClientMessage) -> None:
-        match message["kind"]:
-            case "move":
-                move = message["move"]
+        match message:
+            case MoveMessage(move=move):
                 if self.game.try_move(move):
                     self.client_moves.put_nowait(move)
 

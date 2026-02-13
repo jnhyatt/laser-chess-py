@@ -184,7 +184,7 @@ def draw_wall(
 
 
 def move_arrow() -> list[Vector2]:
-    return [Vector2(80, 0), Vector2(50, -15), Vector2(50, 15)]
+    return [Vector2(100, 0), Vector2(70, -15), Vector2(70, 15)]
 
 
 def turn_arrow(dir: RotateDir) -> list[Vector2]:

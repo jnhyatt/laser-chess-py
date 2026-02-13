@@ -3,8 +3,8 @@ import pygame
 from pygame.math import Vector2
 import sys
 
-from client import LocalClient
-from draw import LaserDrawable, MoveIndicatorDrawable, PieceDrawable
+from client import LocalClient, drawable_for
+from draw import Drawable, LaserDrawable, MoveIndicatorDrawable, PieceDrawable
 from logic import (
     BoardState,
     King,
@@ -14,7 +14,7 @@ from logic import (
     TwoSided,
     Wall,
 )
-from protocol import ClientInterface, ServerInterface
+from picking import Picker
 from server import LocalServer
 
 
@@ -43,8 +43,29 @@ async def main() -> None:
     progress = [0.0]
     asyncio.create_task(advance_laser(progress))
 
+    red = LocalClient()
+    blue = LocalClient()
+    server = LocalServer(tmp_board_state())
+
+    async def start_local_game() -> None:
+        server_task = server.start(red, blue)
+        red_client_task = red.start(server)
+        blue_client_task = blue.start(server)
+        await asyncio.gather(server_task, red_client_task, blue_client_task)
+
+    render_state: list[Drawable] = []
+
+    async def sync_render_state(render_state: list[Drawable]) -> None:
+        while True:
+            render_state[:] = await red.render_state.get()
+
+    asyncio.create_task(start_local_game())
+    asyncio.create_task(sync_render_state(render_state))
+
     while True:
         for event in pygame.event.get():
+            red.on_event(event)
+            blue.on_event(event)
             if event.type == pygame.constants.QUIT:
                 pygame.quit()
                 sys.exit()
@@ -55,47 +76,49 @@ async def main() -> None:
                 color = (180, 180, 128) if (x + y) % 2 == 0 else (24, 24, 24)
                 pygame.draw.rect(surface, color, (x * 90 + 190, y * 90, 90, 90))
 
-        laser = LaserDrawable(
-            [
-                Vector2(9, 8),
-                Vector2(9, 5),
-                Vector2(4, 5),
-                Vector2(4, 6),
-                Vector2(6, 6),
-                Vector2(6, 2),
-                Vector2(5, 2),
-                Vector2(5, 0),
-            ],
-            progress[0],
-        )
-        pieces = tmp_board_state()
-        piece_drawables = [
-            PieceDrawable(x.kind, x.position * 90 + Vector2(235, 45), 0, x.allegiance)
-            for x in pieces
-        ]
-        move_options: list[MoveKind] = [
-            "e",
-            "ne",
-            "n",
-            "nw",
-            "w",
-            "sw",
-            "se",
-            "cw",
-            "ccw",
-        ]
-        move_indicators = [
-            MoveIndicatorDrawable(
-                pieces[8],
-                dir,
-            )
-            for dir in move_options
-        ]
-        laser.draw(surface)
-        for piece in piece_drawables:
-            piece.draw(surface)
-        for indicator in move_indicators:
-            indicator.draw(surface)
+        # laser = LaserDrawable(
+        #     [
+        #         Vector2(9, 8),
+        #         Vector2(9, 5),
+        #         Vector2(4, 5),
+        #         Vector2(4, 6),
+        #         Vector2(6, 6),
+        #         Vector2(6, 2),
+        #         Vector2(5, 2),
+        #         Vector2(5, 0),
+        #     ],
+        #     progress[0],
+        # )
+        # pieces = tmp_board_state()
+        # piece_drawables = [
+        #     PieceDrawable(x.kind, x.position * 90 + Vector2(235, 45), 0, x.allegiance)
+        #     for x in pieces
+        # ]
+        # move_options: list[MoveKind] = [
+        #     "e",
+        #     "ne",
+        #     "n",
+        #     "nw",
+        #     "w",
+        #     "sw",
+        #     "se",
+        #     "cw",
+        #     "ccw",
+        # ]
+        # move_indicators = [
+        #     MoveIndicatorDrawable(
+        #         pieces[8],
+        #         dir,
+        #     )
+        #     for dir in move_options
+        # ]
+        # laser.draw(surface)
+        # for piece in piece_drawables:
+        #     piece.draw(surface)
+        # for indicator in move_indicators:
+        #     indicator.draw(surface)
+        for drawable in render_state:
+            drawable.draw(surface)
 
         pygame.display.flip()
         await asyncio.sleep(1 / 60)  # yield to event loop
@@ -117,19 +140,6 @@ async def animate_laser(progress: list[float]) -> None:
         progress[0] += delta / 1000
         await asyncio.sleep(1 / 60)
     await asyncio.sleep(1)
-
-
-# Orchestrator stuff
-
-
-def start_local_game() -> None:
-    red = LocalClient()
-    blue = LocalClient()
-    server = LocalServer(tmp_board_state())
-    server_task = server.start(red, blue)
-    red_client_task = red.start(server)
-    blue_client_task = blue.start(server)
-    asyncio.gather(server_task, red_client_task, blue_client_task)
 
 
 if __name__ == "__main__":
