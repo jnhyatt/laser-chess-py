@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import itertools
 import math
 from logic import (
+    Allegiance,
     King,
     MoveDir,
     MoveKind,
@@ -167,7 +168,7 @@ def draw_two_sided(
 
 @dataclass
 class GameOverDrawable(Drawable):
-    winner_allegiance: str
+    winner: Allegiance
 
     def draw(self, surface: pygame.Surface) -> None:
         width = surface.get_width()
@@ -177,7 +178,7 @@ class GameOverDrawable(Drawable):
         y = (surface.get_height() - height) // 2
         surface.blit(banner, (0, y))
         font = pygame.font.Font(None, 48)
-        label = f"{self.winner_allegiance.capitalize()} Wins!"
+        label = f"{self.winner.capitalize()} Wins!"
         text = font.render(label, True, (255, 255, 255))
         text_rect = text.get_rect(center=(width // 2, surface.get_height() // 2))
         surface.blit(text, text_rect)

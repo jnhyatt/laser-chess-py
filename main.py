@@ -12,11 +12,6 @@ from server import LocalServer
 # https://github.com/pygame/pygame/pull/4607. The issue is fixed, the maintainers just have to push
 # the button. In the meantime, we're going to do this wild patch.
 def _patch_pygame_sysfont():
-    """Workaround for pygame circular import bug.
-    https://github.com/pygame/pygame/issues/4170
-    Fixed upstream but not yet released:
-    https://github.com/pygame/pygame/pull/4607
-    """
     import sys
     import types
 
@@ -54,7 +49,11 @@ _patch_pygame_sysfont()
 
 async def main() -> None:
     pygame.init()
+    pygame.mixer.init()
     surface = pygame.display.set_mode((1280, 720))
+
+    laser_fire_sound = pygame.mixer.Sound("laserSmall_002.ogg")
+    mirror_hit_sound = pygame.mixer.Sound("impactGlass_light_001.ogg")
 
     red = LocalClient()
     blue = LocalClient()
@@ -83,6 +82,16 @@ async def main() -> None:
                 sys.exit()
 
         surface.fill((28, 72, 28))
+
+        # Drain and play any queued sound effects
+        while not presenter.sound_effects.empty():
+            effect = presenter.sound_effects.get_nowait()
+            match effect:
+                case "laser_fire":
+                    laser_fire_sound.play()
+                case "mirror_hit":
+                    mirror_hit_sound.play()
+
         for y in range(0, 8):
             for x in range(0, 10):
                 color = (180, 180, 128) if (x + y) % 2 == 0 else (24, 24, 24)
