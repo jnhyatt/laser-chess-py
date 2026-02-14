@@ -3,7 +3,7 @@ import asyncio
 import copy
 from dataclasses import dataclass
 import itertools
-from typing import Optional
+from typing import Literal, Optional
 from pygame import Rect, Vector2
 import pygame
 from draw import (
@@ -37,6 +37,9 @@ from protocol import ClientInterface, ServerInterface
 class InitInfo:
     player_allegiance: Allegiance
     opponent_name: str
+
+
+type SoundEffect = Literal["laser_fire", "mirror_hit"]
 
 
 class LocalClient(ClientInterface):
@@ -139,8 +142,22 @@ class Animating(TurnPhase):
         total_dist_px = total_dist_cells * 90  # cells to pixels
         duration = total_dist_px / 720  # 720 pixels/sec
 
+        # Compute progress values at each interior path point (mirror bounces).
+        # Path points: [origin, bounce1, bounce2, ..., terminal]
+        # Interior points at indices 1..len-2 are mirror hits.
+        bounce_progresses: list[float] = []
+        if total_dist_cells > 0 and len(laser_result.path) > 2:
+            cumulative = 0.0
+            for a, b in pairs[:-1]:  # exclude last segment (ends at terminal)
+                cumulative += a.distance_to(b)
+                bounce_progresses.append(cumulative / total_dist_cells)
+
+        # Fire laser sound at animation start
+        presenter.sound_effects.put_nowait("laser_fire")
+
         # Animate laser progress from 0 to 1
         laser_drawable = LaserDrawable(laser_result.path, 0.0)
+        next_bounce = 0  # index into bounce_progresses
         last_time = pygame.time.get_ticks()
         while laser_drawable.progress < 1.0:
             now = pygame.time.get_ticks()
@@ -152,6 +169,15 @@ class Animating(TurnPhase):
                 )
             else:
                 laser_drawable.progress = 1.0
+
+            # Check if we crossed any bounce thresholds
+            while (
+                next_bounce < len(bounce_progresses)
+                and laser_drawable.progress >= bounce_progresses[next_bounce]
+            ):
+                presenter.sound_effects.put_nowait("mirror_hit")
+                next_bounce += 1
+
             await presenter.render_state.put(
                 generate_render_state(self.board_state, None, self.allegiance)
                 + [laser_drawable]
@@ -194,6 +220,7 @@ class GamePresenter:
     clients: dict[Allegiance, LocalClient]
     picker: Picker = Picker()
     render_state: asyncio.Queue[RenderState] = asyncio.Queue()
+    sound_effects: asyncio.Queue[SoundEffect] = asyncio.Queue()
 
     def __init__(
         self,
@@ -264,22 +291,21 @@ def _hit_test_own_piece(
 def generate_render_state(
     board_state: BoardState, selected_index: Optional[int], player_turn: Allegiance
 ) -> list[Drawable]:
-    options = (
+    pieces: list[Drawable] = [drawable_for(piece) for piece in board_state]
+    move_indicators: list[Drawable] = (
         []
         if selected_index is None
-        else move_options(board_state[selected_index], board_state)
+        else [
+            MoveIndicatorDrawable(board_state[selected_index], move)
+            for move in move_options(board_state[selected_index], board_state)
+        ]
     )
-    result = (
-        [drawable_for(piece) for piece in board_state]
-        + [MoveIndicatorDrawable(board_state[selected_index], move) for move in options]
-        + (
-            [GameOverDrawable(winner(board_state))]
-            if winner(board_state) is not None
-            else []
-        )
-        + [TurnIndicatorDrawable(player_turn)]
+    _winner = winner(board_state)
+    game_over: list[Drawable] = (
+        [GameOverDrawable(_winner)] if _winner is not None else []
     )
-    return result
+
+    return pieces + move_indicators + game_over + [TurnIndicatorDrawable(player_turn)]
 
 
 def drawable_for(piece: Piece[PieceKind]) -> PieceDrawable:
