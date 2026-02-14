@@ -1,5 +1,5 @@
 import asyncio
-from typing import AsyncGenerator, Literal, NoReturn, TypedDict
+from typing import Literal, TypedDict
 from pygame import Vector2
 import pygame
 

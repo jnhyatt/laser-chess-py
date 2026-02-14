@@ -1,71 +1,83 @@
 import asyncio
 import pygame
-from pygame.math import Vector2
 import sys
 
-from client import LocalClient, drawable_for
-from draw import Drawable, LaserDrawable, MoveIndicatorDrawable, PieceDrawable
-from logic import (
-    BoardState,
-    King,
-    MoveKind,
-    OneSided,
-    Piece,
-    TwoSided,
-    Wall,
-)
-from picking import Picker
+from client import GamePresenter, LocalClient
+from draw import Drawable
+from logic import load_board_state
 from server import LocalServer
 
 
-def tmp_board_state() -> BoardState:
-    return [
-        Piece(Vector2(5, 0), "red", King()),
-        Piece(Vector2(6, 0), "red", Wall()),
-        Piece(Vector2(4, 0), "red", Wall()),
-        Piece(Vector2(7, 0), "red", TwoSided("se")),
-        Piece(Vector2(3, 7), "blue", King()),
-        Piece(Vector2(5, 7), "blue", Wall()),
-        Piece(Vector2(2, 7), "blue", TwoSided("se")),
-        Piece(Vector2(9, 5), "red", OneSided("sw")),
-        Piece(Vector2(4, 5), "blue", OneSided("se")),
-        Piece(Vector2(4, 6), "red", OneSided("ne")),
-        Piece(Vector2(6, 6), "blue", OneSided("nw")),
-        Piece(Vector2(6, 2), "red", OneSided("sw")),
-        Piece(Vector2(5, 2), "blue", OneSided("ne")),
-    ]
+# Workaround for pygame circular import bug. See https://github.com/pygame/pygame/issues/4170 and
+# https://github.com/pygame/pygame/pull/4607. The issue is fixed, the maintainers just have to push
+# the button. In the meantime, we're going to do this wild patch.
+def _patch_pygame_sysfont():
+    """Workaround for pygame circular import bug.
+    https://github.com/pygame/pygame/issues/4170
+    Fixed upstream but not yet released:
+    https://github.com/pygame/pygame/pull/4607
+    """
+    import sys
+    import types
+
+    # Pre-load a stub for pygame.font so sysfont's top-level
+    # `from pygame.font import Font` doesn't trigger the real import cycle.
+    stub = types.ModuleType("pygame.font")
+    stub.Font = None
+    sys.modules["pygame.font"] = stub
+
+    # sysfont can now import without a cycle
+    import pygame.sysfont
+
+    # Remove the stub so the real font module loads fresh
+    del sys.modules["pygame.font"]
+    import pygame.font
+
+    # Patch the two references that were bound to the stub's None
+    pygame.sysfont.Font = pygame.font.Font
+
+    def _patched_font_constructor(fontpath, size, bold, italic):
+        from pygame.font import Font
+
+        font = Font(fontpath, size)
+        if bold:
+            font.set_bold(True)
+        if italic:
+            font.set_italic(True)
+        return font
+
+    pygame.sysfont.font_constructor = _patched_font_constructor
+
+
+_patch_pygame_sysfont()
 
 
 async def main() -> None:
     pygame.init()
     surface = pygame.display.set_mode((1280, 720))
 
-    progress = [0.0]
-    asyncio.create_task(advance_laser(progress))
-
     red = LocalClient()
     blue = LocalClient()
-    server = LocalServer(tmp_board_state())
+    server = LocalServer(load_board_state("classic.json"))
+    presenter = GamePresenter(local_players={"red", "blue"}, red=red, blue=blue)
 
-    async def start_local_game() -> None:
+    async def start_game() -> None:
         server_task = server.start(red, blue)
-        red_client_task = red.start(server)
-        blue_client_task = blue.start(server)
-        await asyncio.gather(server_task, red_client_task, blue_client_task)
+        presenter_task = presenter.start(server)
+        await asyncio.gather(server_task, presenter_task)
 
     render_state: list[Drawable] = []
 
-    async def sync_render_state(render_state: list[Drawable]) -> None:
+    async def sync_render_state() -> None:
         while True:
-            render_state[:] = await red.render_state.get()
+            render_state[:] = await presenter.render_state.get()
 
-    asyncio.create_task(start_local_game())
-    asyncio.create_task(sync_render_state(render_state))
+    asyncio.create_task(start_game())
+    asyncio.create_task(sync_render_state())
 
     while True:
         for event in pygame.event.get():
-            red.on_event(event)
-            blue.on_event(event)
+            presenter.on_event(event)
             if event.type == pygame.constants.QUIT:
                 pygame.quit()
                 sys.exit()
@@ -76,70 +88,11 @@ async def main() -> None:
                 color = (180, 180, 128) if (x + y) % 2 == 0 else (24, 24, 24)
                 pygame.draw.rect(surface, color, (x * 90 + 190, y * 90, 90, 90))
 
-        # laser = LaserDrawable(
-        #     [
-        #         Vector2(9, 8),
-        #         Vector2(9, 5),
-        #         Vector2(4, 5),
-        #         Vector2(4, 6),
-        #         Vector2(6, 6),
-        #         Vector2(6, 2),
-        #         Vector2(5, 2),
-        #         Vector2(5, 0),
-        #     ],
-        #     progress[0],
-        # )
-        # pieces = tmp_board_state()
-        # piece_drawables = [
-        #     PieceDrawable(x.kind, x.position * 90 + Vector2(235, 45), 0, x.allegiance)
-        #     for x in pieces
-        # ]
-        # move_options: list[MoveKind] = [
-        #     "e",
-        #     "ne",
-        #     "n",
-        #     "nw",
-        #     "w",
-        #     "sw",
-        #     "se",
-        #     "cw",
-        #     "ccw",
-        # ]
-        # move_indicators = [
-        #     MoveIndicatorDrawable(
-        #         pieces[8],
-        #         dir,
-        #     )
-        #     for dir in move_options
-        # ]
-        # laser.draw(surface)
-        # for piece in piece_drawables:
-        #     piece.draw(surface)
-        # for indicator in move_indicators:
-        #     indicator.draw(surface)
         for drawable in render_state:
             drawable.draw(surface)
 
         pygame.display.flip()
         await asyncio.sleep(1 / 60)  # yield to event loop
-
-
-async def advance_laser(progress: list[float]) -> None:
-    progress[0] = 0
-    while True:
-        await animate_laser(progress)
-        progress[0] = 0
-
-
-async def animate_laser(progress: list[float]) -> None:
-    last_time = pygame.time.get_ticks()
-    while progress[0] < 1:
-        now = pygame.time.get_ticks()
-        delta = now - last_time
-        last_time = now
-        progress[0] += delta / 1000
-        await asyncio.sleep(1 / 60)
-    await asyncio.sleep(1)
 
 
 if __name__ == "__main__":

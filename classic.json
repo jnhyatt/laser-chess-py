@@ -1,0 +1,166 @@
+{
+    "pieces": [
+        {
+            "x": 4,
+            "y": 0,
+            "allegiance": "red",
+            "kind": "wall"
+        },
+        {
+            "x": 5,
+            "y": 0,
+            "allegiance": "red",
+            "kind": "king"
+        },
+        {
+            "x": 6,
+            "y": 0,
+            "allegiance": "red",
+            "kind": "wall"
+        },
+        {
+            "x": 7,
+            "y": 0,
+            "allegiance": "red",
+            "kind": "two-sided",
+            "dir": "se"
+        },
+        {
+            "x": 3,
+            "y": 2,
+            "allegiance": "blue",
+            "kind": "one-sided",
+            "dir": "nw"
+        },
+        {
+            "x": 6,
+            "y": 2,
+            "allegiance": "red",
+            "kind": "one-sided",
+            "dir": "ne"
+        },
+        {
+            "x": 0,
+            "y": 3,
+            "allegiance": "red",
+            "kind": "one-sided",
+            "dir": "ne"
+        },
+        {
+            "x": 1,
+            "y": 3,
+            "allegiance": "blue",
+            "kind": "one-sided",
+            "dir": "sw"
+        },
+        {
+            "x": 4,
+            "y": 3,
+            "allegiance": "blue",
+            "kind": "one-sided",
+            "dir": "se"
+        },
+        {
+            "x": 5,
+            "y": 3,
+            "allegiance": "red",
+            "kind": "two-sided",
+            "dir": "se"
+        },
+        {
+            "x": 8,
+            "y": 3,
+            "allegiance": "red",
+            "kind": "one-sided",
+            "dir": "se"
+        },
+        {
+            "x": 9,
+            "y": 3,
+            "allegiance": "blue",
+            "kind": "one-sided",
+            "dir": "nw"
+        },
+        {
+            "x": 5,
+            "y": 7,
+            "allegiance": "blue",
+            "kind": "wall"
+        },
+        {
+            "x": 4,
+            "y": 7,
+            "allegiance": "blue",
+            "kind": "king"
+        },
+        {
+            "x": 3,
+            "y": 7,
+            "allegiance": "blue",
+            "kind": "wall"
+        },
+        {
+            "x": 2,
+            "y": 7,
+            "allegiance": "blue",
+            "kind": "two-sided",
+            "dir": "se"
+        },
+        {
+            "x": 6,
+            "y": 5,
+            "allegiance": "red",
+            "kind": "one-sided",
+            "dir": "se"
+        },
+        {
+            "x": 3,
+            "y": 5,
+            "allegiance": "blue",
+            "kind": "one-sided",
+            "dir": "sw"
+        },
+        {
+            "x": 9,
+            "y": 4,
+            "allegiance": "blue",
+            "kind": "one-sided",
+            "dir": "sw"
+        },
+        {
+            "x": 8,
+            "y": 4,
+            "allegiance": "red",
+            "kind": "one-sided",
+            "dir": "ne"
+        },
+        {
+            "x": 5,
+            "y": 4,
+            "allegiance": "red",
+            "kind": "one-sided",
+            "dir": "nw"
+        },
+        {
+            "x": 4,
+            "y": 4,
+            "allegiance": "blue",
+            "kind": "two-sided",
+            "dir": "se"
+        },
+        {
+            "x": 1,
+            "y": 4,
+            "allegiance": "blue",
+            "kind": "one-sided",
+            "dir": "nw"
+        },
+        {
+            "x": 0,
+            "y": 4,
+            "allegiance": "red",
+            "kind": "one-sided",
+            "dir": "se"
+        }
+    ]
+}

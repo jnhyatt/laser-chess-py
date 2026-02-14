@@ -165,6 +165,36 @@ def draw_two_sided(
     )
 
 
+@dataclass
+class GameOverDrawable(Drawable):
+    winner_allegiance: str
+
+    def draw(self, surface: pygame.Surface) -> None:
+        width = surface.get_width()
+        height = 80
+        banner = pygame.Surface((width, height), pygame.SRCALPHA)
+        banner.fill((0, 0, 0, 160))
+        y = (surface.get_height() - height) // 2
+        surface.blit(banner, (0, y))
+        font = pygame.font.Font(None, 48)
+        label = f"{self.winner_allegiance.capitalize()} Wins!"
+        text = font.render(label, True, (255, 255, 255))
+        text_rect = text.get_rect(center=(width // 2, surface.get_height() // 2))
+        surface.blit(text, text_rect)
+
+
+@dataclass
+class TurnIndicatorDrawable(Drawable):
+    allegiance: str
+
+    def draw(self, surface: pygame.Surface) -> None:
+        color = (255, 0, 0) if self.allegiance == "red" else (0, 0, 255)
+        font = pygame.font.Font(None, 36)
+        label = f"{self.allegiance.capitalize()} to move"
+        text = font.render(label, True, color)
+        surface.blit(text, (10, 10))
+
+
 def draw_king(
     surface: pygame.Surface, piece: King, position: Vector2, allegiance: str
 ) -> None:

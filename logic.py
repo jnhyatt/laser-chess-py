@@ -1,6 +1,7 @@
+import json
 from dataclasses import dataclass
 from pygame.math import Vector2
-from typing import Literal, Optional, TypeGuard, TypeVar, TypedDict
+from typing import Literal, Optional, TypeGuard
 
 
 type PieceKind = OneSided | TwoSided | King | Wall
@@ -79,9 +80,6 @@ class Wall:
         return Wall(stacked=False) if self.stacked else None
 
 
-# T = TypeVar("T", OneSided, TwoSided, King, Wall)
-
-
 @dataclass
 class Piece[T: PieceKind]:
     position: Vector2
@@ -118,6 +116,12 @@ type TwoSidedDir = Literal["ne", "se"]
 
 
 @dataclass
+class LaserResult:
+    path: list[Vector2]
+    hit: Optional[LaserHit]
+
+
+@dataclass
 class Laser:
     position: Vector2
     direction: LaserDir
@@ -130,16 +134,24 @@ class Laser:
             case "blue":
                 return Laser(Vector2(9, 8), "n")
 
-    def bounce(self, state: BoardState) -> Optional[LaserHit]:
-        hit_index = self.cast(state)
-        if hit_index is None:
-            return None
-        match state[hit_index].kind.reflect(self.direction):
-            case "n" | "e" | "s" | "w" as new_dir:
-                self.direction = new_dir
-                return self.bounce(state)
-            case new_piece:
-                return LaserHit(hit_index, new_piece)
+    def bounce(self, state: BoardState) -> LaserResult:
+        path: list[Vector2] = [Vector2(self.position)]
+
+        def trace() -> Optional[LaserHit]:
+            hit_index = self.cast(state)
+            # cast mutates self.position to the hit piece's position (or off-board)
+            path.append(Vector2(self.position))
+            if hit_index is None:
+                return None
+            match state[hit_index].kind.reflect(self.direction):
+                case "n" | "e" | "s" | "w" as new_dir:
+                    self.direction = new_dir
+                    return trace()
+                case new_piece:
+                    return LaserHit(hit_index, new_piece)
+
+        hit = trace()
+        return LaserResult(path, hit)
 
     # Raycast a laser in a straight line until it hits a wall (return None) or a piece (return
     # its index).
@@ -155,6 +167,8 @@ class Laser:
             return hit_index
         return next_seg.cast(state)
 
+    # Advance the laser one cell in its current direction. Returns the new laser state, or None if
+    # it goes off the board.
     def advance(self) -> Optional[Laser]:
         match self.direction:
             case "n":
@@ -232,6 +246,29 @@ def add_dir(position: Vector2, dir: MoveDir) -> Vector2:
             return position + Vector2(-1, -1)
 
 
+def fire_laser(player: Allegiance, state: BoardState) -> LaserResult:
+    return Laser.start(player).bounce(state)
+
+
+def move_options(piece: Piece[PieceKind], state: BoardState) -> set[MoveKind]:
+    options: set[MoveKind] = set()
+    # Rotation options for pieces that can rotate
+    match piece.kind.kind:
+        case "one-sided" | "two-sided":
+            options.add("cw")
+            options.add("ccw")
+    # Directional movement: check all 8 adjacent cells
+    all_dirs: list[MoveDir] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
+    for dir in all_dirs:
+        target = add_dir(piece.position, dir)
+        if not (0 <= target.x < 10 and 0 <= target.y < 8):
+            continue
+        if any(p.position == target for p in state):
+            continue
+        options.add(dir)
+    return options
+
+
 def rotate_one_sided(piece: OneSided, dir: RotateDir) -> None:
     match piece.dir:
         case "ne":
@@ -246,3 +283,24 @@ def rotate_one_sided(piece: OneSided, dir: RotateDir) -> None:
 
 def rotate_two_sided(piece: TwoSided) -> None:
     piece.dir = "se" if piece.dir == "ne" else "ne"
+
+
+def load_board_state(path: str) -> BoardState:
+    with open(path) as f:
+        data = json.load(f)
+    pieces: BoardState = []
+    for p in data["pieces"]:
+        kind: PieceKind
+        match p["kind"]:
+            case "one-sided":
+                kind = OneSided(p["dir"])
+            case "two-sided":
+                kind = TwoSided(p["dir"])
+            case "king":
+                kind = King()
+            case "wall":
+                kind = Wall(p.get("stacked", True))
+            case other:
+                raise ValueError(f"Unknown piece kind: {other}")
+        pieces.append(Piece(Vector2(p["x"], p["y"]), p["allegiance"], kind))
+    return pieces
